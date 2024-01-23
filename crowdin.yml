@@ -1,0 +1,3 @@
+files:
+  - source: /translation/active.en.json
+    translation: /translation/active.%two_letters_code%.json
