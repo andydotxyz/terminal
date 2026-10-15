@@ -259,7 +259,7 @@ func (t *Terminal) RemoveListener(listener chan Config) {
 func (t *Terminal) Resize(s fyne.Size) {
 	cellSize := t.guessCellSize()
 	cols := uint(math.Floor(float64(s.Width) / float64(cellSize.Width)))
-	rows := uint(math.Floor(float64(s.Height) / float64(cellSize.Height)))
+	rows := max(uint(math.Floor(float64(s.Height)/float64(cellSize.Height))), 1)
 	if (t.config.Columns == cols) && (t.config.Rows == rows) {
 		return
 	}
@@ -270,6 +270,9 @@ func (t *Terminal) Resize(s fyne.Size) {
 	t.config.Columns, t.config.Rows = cols, rows
 	if t.scrollBottom == 0 || t.scrollBottom == oldRows-1 {
 		t.scrollBottom = int(t.config.Rows) - 1
+	}
+	if t.scrollBottom >= int(rows) {
+		t.scrollTop, t.scrollBottom = 0, int(rows)-1
 	}
 	if cols > 0 && t.cursorCol > int(cols) {
 		// we got narrower, keep the cursor on screen so that output will wrap

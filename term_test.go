@@ -94,6 +94,27 @@ func TestTerminal_Resize_Narrower(t *testing.T) {
 	}
 }
 
+func TestTerminal_Resize_NoPanic(t *testing.T) {
+	for name, tt := range map[string]struct {
+		rows          float32
+		before, after string
+	}{
+		"region kept":     {rows: 3, before: "\x1b[2;4r", after: "\x1bM"},
+		"region too tall": {rows: 3, after: "\x1b[1;4r\x1bM"},
+		"no rows":         {rows: 0.5, after: "\x1bM"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10) + tt.before))
+
+			term.Resize(fyne.NewSize(10*cell.Width, tt.rows*cell.Height))
+			assert.NotPanics(t, func() { term.handleOutput([]byte(tt.after)) })
+		})
+	}
+}
+
 func TestTerminal_AddListener(t *testing.T) {
 	term := New()
 	listen := make(chan Config, 1)

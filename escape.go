@@ -628,6 +628,16 @@ func escapeSetScrollArea(t *Terminal, msg string) {
 		}
 	}
 
+	rows := int(t.config.Rows)
+	if start < 0 {
+		start = 0
+	}
+	if end > rows-1 {
+		end = rows - 1
+	}
+	if start >= end {
+		start, end = 0, rows-1
+	}
 	t.scrollTop = start
 	t.scrollBottom = end
 }
