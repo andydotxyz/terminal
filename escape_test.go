@@ -236,6 +236,14 @@ func TestScrollBack_ShortGrid(t *testing.T) {
 	}
 }
 
+func TestScrollUp_LargeCount(t *testing.T) {
+	term := newScrollbackTerm()
+
+	term.handleOutput([]byte("\x1b[1000000S"))
+	assert.Equal(t, "\n\n\n\n", term.Text())
+	assert.Equal(t, 15, len(term.content.Rows))
+}
+
 func rowText(row widget.TextGridRow) []rune {
 	result := make([]rune, len(row.Cells))
 	for i, c := range row.Cells {

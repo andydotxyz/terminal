@@ -652,6 +652,9 @@ func escapeScrollUp(t *Terminal, msg string) {
 	if t.cursorRow < t.scrollTop || t.cursorRow > t.scrollBottom {
 		return
 	}
+	if limit := t.scrollBottom - t.scrollTop + 1; lines > limit {
+		lines = limit
+	}
 
 	// Calculate new cursor position after scrolling
 	newCursorRow := t.cursorRow - lines
