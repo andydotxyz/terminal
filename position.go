@@ -27,13 +27,12 @@ func (t *Terminal) getTermPosition(pos fyne.Position) position {
 	return position{col, row}
 }
 
-// getScreenPosition returns the screen-relative position (ignoring scroll offset).
+// getScreenPosition returns the screen-relative position (excluding scrollback).
 // Used for mouse reporting to terminal applications.
 func (t *Terminal) getScreenPosition(pos fyne.Position) position {
-	cell := t.guessCellSize()
-	col := int(pos.X/cell.Width) + 1
-	row := int(pos.Y/cell.Height) + 1
-	return position{col, row}
+	p := t.getTermPosition(pos)
+	p.Row = max(p.Row-t.rowOffset(), 1)
+	return p
 }
 
 // getTextPosition converts a terminal position (row and col) to fyne coordinates.

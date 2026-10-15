@@ -23,6 +23,14 @@ func TestClearScreen(t *testing.T) {
 	assert.Equal(t, "", term.content.Text())
 }
 
+func TestClearScreenToCursor(t *testing.T) {
+	term := newScrollbackTerm()
+
+	term.handleOutput([]byte("\x1b[4;2H\x1b[1J"))
+	lines := strings.Split(term.Text(), "\n")
+	assert.Equal(t, []string{"", "", ""}, lines[:3])
+}
+
 func TestClearScrollback(t *testing.T) {
 	term := New()
 	term.config.Columns = 80
@@ -186,12 +194,91 @@ func TestScrollBack_MaxLimit(t *testing.T) {
 	assert.LessOrEqual(t, len(term.content.Rows), maxRows)
 }
 
+func TestScrollBack_EditScreen(t *testing.T) {
+	for name, tt := range map[string]struct{ in, out string }{
+		"erase chars":  {"\x1b[1;1H\x1b[2X", "  \nL7\nL8\nL9\nL10"},
+		"delete lines": {"\x1b[2;1H\x1b[M", "L6\nL8\nL9\nL10\n"},
+		"scroll down":  {"\x1b[T", "\nL6\nL7\nL8\nL9"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := newScrollbackTerm()
+
+			term.handleOutput([]byte(tt.in))
+			assert.Equal(t, tt.out, term.Text())
+		})
+	}
+}
+
+func TestAltBuffer_RestoresScreen(t *testing.T) {
+	for name, output := range map[string]string{
+		"scrolled":           numberedLines(10),
+		"scrollback cleared": "\x1b[3J",
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := newScrollbackTerm()
+
+			term.handleOutput([]byte("\x1b[?1049h" + output + "\x1b[?1049lX"))
+			assert.Equal(t, "L6\nL7\nL8\nL9\nL10X", term.Text())
+			assert.Equal(t, 10, len(term.content.Rows))
+		})
+	}
+}
+
+func TestScrollBack_ShortGrid(t *testing.T) {
+	for name, tt := range map[string]struct{ in, out string }{
+		"line feed":           {"Top\x1b[5;1H\n", "\n\n\n\n"},
+		"scroll up":           {"Top\x1b[S", "\n\n\n\n"},
+		"line feed in region": {"\x1b[1;4rTop\r\nBottom\x1b[4;1H\n", "Bottom\n\n\n\n"},
+		"reverse index":       {"Top\x1bM", "\nTop\n\n\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			term.config.Columns = 10
+			term.config.Rows = 5
+			term.scrollBottom = int(term.config.Rows) - 1
+			term.Refresh()
+
+			assert.NotPanics(t, func() { term.handleOutput([]byte(tt.in)) })
+			assert.Equal(t, tt.out, term.Text())
+		})
+	}
+}
+
+func TestScrollUp_LargeCount(t *testing.T) {
+	term := newScrollbackTerm()
+
+	term.handleOutput([]byte("\x1b[1000000S"))
+	assert.Equal(t, "\n\n\n\n", term.Text())
+	assert.Equal(t, 15, len(term.content.Rows))
+}
+
 func rowText(row widget.TextGridRow) []rune {
 	result := make([]rune, len(row.Cells))
 	for i, c := range row.Cells {
 		result[i] = c.Rune
 	}
 	return result
+}
+
+// newScrollbackTerm returns a 10x5 terminal showing L6 to L10, with L1 to L5 in its scrollback
+// and the cursor after L10.
+func newScrollbackTerm() *Terminal {
+	term := New()
+	term.config.Columns = 10
+	term.config.Rows = 5
+	term.scrollBottom = int(term.config.Rows) - 1
+	term.Refresh()
+
+	term.handleOutput([]byte(numberedLines(10)))
+	return term
+}
+
+func numberedLines(n int) string {
+	lines := make([]string, n)
+	for i := range lines {
+		lines[i] = "L" + strconv.Itoa(i+1)
+	}
+	return strings.Join(lines, "\r\n")
 }
 
 func TestInsertDeleteChars(t *testing.T) {

@@ -70,7 +70,7 @@ func (t *Terminal) enterAltBuffer() {
 		copy(cells, row.Cells)
 		t.altSavedGrid[i] = widget.TextGridRow{Cells: cells}
 	}
-	t.altSavedRow = t.cursorRow
+	t.altSavedRow = t.rowOffset() + t.cursorRow
 	t.altSavedCol = t.cursorCol
 	t.altBufferActive = true
 	t.clearScreen()
@@ -84,19 +84,10 @@ func (t *Terminal) exitAltBuffer() {
 	}
 	t.altBufferActive = false
 	if t.altSavedGrid != nil {
-		// Restore saved grid content
-		for i, row := range t.altSavedGrid {
-			if i < len(t.content.Rows) {
-				t.content.SetRow(i, row)
-			}
-		}
-		// Clear any extra rows beyond the saved content
-		for i := len(t.altSavedGrid); i < len(t.content.Rows); i++ {
-			t.content.SetRow(i, widget.TextGridRow{})
-		}
+		t.content.Rows = t.altSavedGrid
 		t.altSavedGrid = nil
 	}
-	t.cursorRow = t.altSavedRow
+	t.cursorRow = min(max(t.altSavedRow-t.rowOffset(), 0), int(t.config.Rows)-1)
 	t.cursorCol = t.altSavedCol
 }
 
@@ -144,7 +135,7 @@ func (t *Terminal) clearScreenToCursor() {
 
 	t.content.SetRow(contentRow, widget.TextGridRow{Cells: cells})
 
-	for i := off; i < contentRow-1; i++ {
+	for i := off; i < contentRow; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }
@@ -230,7 +221,8 @@ func escapeEraseChars(t *Terminal, msg string) {
 		return
 	}
 
-	row := t.content.Row(t.cursorRow)
+	contentRow := t.rowOffset() + t.cursorRow
+	row := t.content.Row(contentRow)
 	cellStyle := &widget.CustomTextGridStyle{FGColor: t.currentFG, BGColor: t.currentBG}
 	// Extend row if cursor is beyond current length
 	for len(row.Cells) < t.cursorCol+count {
@@ -239,7 +231,7 @@ func escapeEraseChars(t *Terminal, msg string) {
 	for i := 0; i < count; i++ {
 		row.Cells[t.cursorCol+i] = widget.TextGridCell{Rune: ' ', Style: cellStyle}
 	}
-	t.content.SetRow(t.cursorRow, row)
+	t.content.SetRow(contentRow, row)
 }
 
 // escapeDeleteLines handles CSI Ps M (DL - Delete Line).
@@ -249,10 +241,11 @@ func escapeDeleteLines(t *Terminal, msg string) {
 	if lines == 0 {
 		lines = 1
 	}
-	for i := t.cursorRow; i <= t.scrollBottom-lines; i++ {
+	off := t.rowOffset()
+	for i := off + t.cursorRow; i <= off+t.scrollBottom-lines; i++ {
 		t.content.SetRow(i, t.content.Row(i+lines))
 	}
-	for i := t.scrollBottom - lines + 1; i <= t.scrollBottom; i++ {
+	for i := off + t.scrollBottom - lines + 1; i <= off+t.scrollBottom; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }
@@ -264,10 +257,11 @@ func escapeScrollDown(t *Terminal, msg string) {
 	if lines == 0 {
 		lines = 1
 	}
-	for i := t.scrollBottom; i >= t.scrollTop+lines; i-- {
+	off := t.rowOffset()
+	for i := off + t.scrollBottom; i >= off+t.scrollTop+lines; i-- {
 		t.content.SetRow(i, t.content.Row(i-lines))
 	}
-	for i := t.scrollTop; i < t.scrollTop+lines && i <= t.scrollBottom; i++ {
+	for i := off + t.scrollTop; i < off+t.scrollTop+lines && i <= off+t.scrollBottom; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }
@@ -634,6 +628,16 @@ func escapeSetScrollArea(t *Terminal, msg string) {
 		}
 	}
 
+	rows := int(t.config.Rows)
+	if start < 0 {
+		start = 0
+	}
+	if end > rows-1 {
+		end = rows - 1
+	}
+	if start >= end {
+		start, end = 0, rows-1
+	}
 	t.scrollTop = start
 	t.scrollBottom = end
 }
@@ -648,6 +652,9 @@ func escapeScrollUp(t *Terminal, msg string) {
 	if t.cursorRow < t.scrollTop || t.cursorRow > t.scrollBottom {
 		return
 	}
+	if limit := t.scrollBottom - t.scrollTop + 1; lines > limit {
+		lines = limit
+	}
 
 	// Calculate new cursor position after scrolling
 	newCursorRow := t.cursorRow - lines
@@ -660,6 +667,7 @@ func escapeScrollUp(t *Terminal, msg string) {
 	// Move cursor to the new position
 	t.moveCursor(newCursorRow, t.cursorCol)
 
+	t.fillScreen()
 	off := t.rowOffset()
 	fullScreen := t.scrollTop == 0 && t.scrollBottom >= int(t.config.Rows)-1
 	if fullScreen {

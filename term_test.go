@@ -3,6 +3,8 @@ package terminal
 import (
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,13 +28,14 @@ func TestTerminal_CreateRenderer_KeepsContent(t *testing.T) {
 	term.handleOutput([]byte("Hello"))
 	assert.Equal(t, "Hello", term.Text())
 
-	grid, cursor := term.content, term.cursor
+	grid, cursor, scroll := term.content, term.cursor, term.scrollContainer
 	// Fyne destroys renderers of widgets that have not been drawn for a while
 	// (e.g. a background tab) and then calls CreateRenderer again.
 	term.CreateRenderer()
 
 	assert.Same(t, grid, term.content)
 	assert.Same(t, cursor, term.cursor)
+	assert.Same(t, scroll, term.scrollContainer)
 	assert.Equal(t, "Hello", term.Text())
 }
 
@@ -92,6 +95,106 @@ func TestTerminal_Resize_Narrower(t *testing.T) {
 		}
 		assert.LessOrEqual(t, len(row.Cells), 5)
 	}
+}
+
+func TestTerminal_Resize_KeepsCursorLine(t *testing.T) {
+	for name, rows := range map[string]float32{"taller": 8, "shorter": 3} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10)))
+
+			term.Resize(fyne.NewSize(10*cell.Width, rows*cell.Height))
+			term.handleOutput([]byte("X"))
+			lines := strings.Split(term.Text(), "\n")
+			assert.Equal(t, "L10X", lines[len(lines)-1])
+		})
+	}
+}
+
+func TestTerminal_Resize_AltBuffer(t *testing.T) {
+	for name, rows := range map[string]float32{"taller": 8, "shorter": 3} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10) + "\x1b[?1049h"))
+
+			term.Resize(fyne.NewSize(10*cell.Width, rows*cell.Height))
+			term.handleOutput([]byte("\x1b[?1049lX"))
+			lines := strings.Split(term.Text(), "\n")
+			assert.Equal(t, "L10X", lines[len(lines)-1])
+		})
+	}
+}
+
+func TestTerminal_Resize_NoPanic(t *testing.T) {
+	for name, tt := range map[string]struct {
+		rows          float32
+		before, after string
+	}{
+		"region kept":     {rows: 3, before: "\x1b[2;4r", after: "\x1bM"},
+		"region too tall": {rows: 3, after: "\x1b[1;4r\x1bM"},
+		"no rows":         {rows: 0.5, after: "\x1bM"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10) + tt.before))
+
+			term.Resize(fyne.NewSize(10*cell.Width, tt.rows*cell.Height))
+			assert.NotPanics(t, func() { term.handleOutput([]byte(tt.after)) })
+		})
+	}
+}
+
+func TestTerminal_RunWithConnection_ScrollsToBottom(t *testing.T) {
+	term := New()
+	cell := term.guessCellSize()
+	term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+
+	_ = term.RunWithConnection(NopCloser(io.Discard), strings.NewReader(numberedLines(10)))
+	scroll := term.scrollContainer
+	assert.Equal(t, scroll.Content.MinSize().Height-scroll.Size().Height, scroll.Offset.Y)
+}
+
+func TestTerminal_RunWithConnection_WaitsForRefresh(t *testing.T) {
+	term := New()
+	term.Resize(fyne.NewSize(100, 100))
+
+	app := fyne.CurrentApp()
+	driver := &queueDriver{Driver: app.Driver()}
+	fyne.SetCurrentApp(&queueApp{App: app, driver: driver})
+	defer fyne.SetCurrentApp(app)
+
+	_ = term.RunWithConnection(NopCloser(io.Discard), strings.NewReader("hello"))
+	assert.Empty(t, driver.queue)
+}
+
+// queueDriver queues fyne.Do calls like a busy main loop and runs the queue on fyne.DoAndWait.
+type queueDriver struct {
+	fyne.Driver
+	queue []func()
+}
+
+func (d *queueDriver) DoFromGoroutine(f func(), wait bool) {
+	d.queue = append(d.queue, f)
+	for wait && len(d.queue) > 0 {
+		next := d.queue[0]
+		d.queue = d.queue[1:]
+		next()
+	}
+}
+
+type queueApp struct {
+	fyne.App
+	driver fyne.Driver
+}
+
+func (a *queueApp) Driver() fyne.Driver {
+	return a.driver
 }
 
 func TestTerminal_AddListener(t *testing.T) {

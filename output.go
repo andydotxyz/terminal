@@ -345,6 +345,7 @@ func (t *Terminal) ringBell() {
 }
 
 func (t *Terminal) scrollUp() {
+	t.fillScreen()
 	off := t.rowOffset()
 	for i := t.scrollBottom; i > t.scrollTop; i-- {
 		t.content.Rows[off+i] = t.content.Row(off + i - 1)
@@ -354,6 +355,7 @@ func (t *Terminal) scrollUp() {
 }
 
 func (t *Terminal) scrollDown() {
+	t.fillScreen()
 	off := t.rowOffset()
 	fullScreen := t.scrollTop == 0 && t.scrollBottom >= int(t.config.Rows)-1
 

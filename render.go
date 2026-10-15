@@ -102,8 +102,10 @@ func (t *Terminal) CreateRenderer() fyne.WidgetRenderer {
 		t.cursor.Resize(fyne.NewSize(cursorWidth, t.guessCellSize().Height))
 	}
 
-	inner := container.New(&termContentLayout{grid: t.content}, t.content, t.cursor)
-	t.scrollContainer = container.NewVScroll(inner)
+	if t.scrollContainer == nil {
+		inner := container.New(&termContentLayout{grid: t.content}, t.content, t.cursor)
+		t.scrollContainer = container.NewVScroll(inner)
+	}
 
 	r := &render{term: t}
 	t.cursorMoved = r.moveCursor

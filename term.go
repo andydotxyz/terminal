@@ -72,7 +72,7 @@ type Terminal struct {
 
 	// Alternate screen buffer (used by curses/fullscreen apps via ?1049h/?47h)
 	altSavedGrid    []widget.TextGridRow // saved main screen rows
-	altSavedRow     int                  // saved cursor row
+	altSavedRow     int                  // saved cursor row, including scrollback
 	altSavedCol     int                  // saved cursor col
 	altBufferActive bool                 // true when alternate buffer is in use
 
@@ -259,7 +259,7 @@ func (t *Terminal) RemoveListener(listener chan Config) {
 func (t *Terminal) Resize(s fyne.Size) {
 	cellSize := t.guessCellSize()
 	cols := uint(math.Floor(float64(s.Width) / float64(cellSize.Width)))
-	rows := uint(math.Floor(float64(s.Height) / float64(cellSize.Height)))
+	rows := max(uint(math.Floor(float64(s.Height)/float64(cellSize.Height))), 1)
 	if (t.config.Columns == cols) && (t.config.Rows == rows) {
 		return
 	}
@@ -267,9 +267,14 @@ func (t *Terminal) Resize(s fyne.Size) {
 	t.BaseWidget.Resize(s)
 
 	oldRows := int(t.config.Rows)
+	cursorLine := t.rowOffset() + t.cursorRow
 	t.config.Columns, t.config.Rows = cols, rows
+	t.cursorRow = min(max(cursorLine-t.rowOffset(), 0), int(rows)-1)
 	if t.scrollBottom == 0 || t.scrollBottom == oldRows-1 {
 		t.scrollBottom = int(t.config.Rows) - 1
+	}
+	if t.scrollBottom >= int(rows) {
+		t.scrollTop, t.scrollBottom = 0, int(rows)-1
 	}
 	if cols > 0 && t.cursorCol > int(cols) {
 		// we got narrower, keep the cursor on screen so that output will wrap
@@ -488,8 +493,11 @@ func (t *Terminal) run() {
 		leftOver = t.handleOutput(fullBuf[:num])
 		if len(leftOver) == 0 || time.Since(t.lastRefresh) > maxRefreshInterval {
 			t.lastRefresh = time.Now()
-			fyne.Do(func() {
+			fyne.DoAndWait(func() {
 				if t.scrollContainer != nil {
+					// ScrollToBottom uses the content's current size, so lay it out for the new rows first
+					content := t.scrollContainer.Content
+					content.Resize(content.MinSize().Max(t.scrollContainer.Size()))
 					t.scrollContainer.ScrollToBottom()
 				}
 				t.Refresh()
@@ -616,6 +624,13 @@ func (t *Terminal) rowOffset() int {
 		return 0
 	}
 	return off
+}
+
+// fillScreen adds empty rows until the grid is at least as tall as the screen.
+func (t *Terminal) fillScreen() {
+	for len(t.content.Rows) < int(t.config.Rows) {
+		t.content.Rows = append(t.content.Rows, widget.TextGridRow{})
+	}
 }
 
 // trimScrollback removes excess scrollback rows beyond the configured maximum.
