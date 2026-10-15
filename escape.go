@@ -70,7 +70,7 @@ func (t *Terminal) enterAltBuffer() {
 		copy(cells, row.Cells)
 		t.altSavedGrid[i] = widget.TextGridRow{Cells: cells}
 	}
-	t.altSavedRow = t.cursorRow
+	t.altSavedRow = t.rowOffset() + t.cursorRow
 	t.altSavedCol = t.cursorCol
 	t.altBufferActive = true
 	t.clearScreen()
@@ -87,7 +87,7 @@ func (t *Terminal) exitAltBuffer() {
 		t.content.Rows = t.altSavedGrid
 		t.altSavedGrid = nil
 	}
-	t.cursorRow = t.altSavedRow
+	t.cursorRow = min(max(t.altSavedRow-t.rowOffset(), 0), int(t.config.Rows)-1)
 	t.cursorCol = t.altSavedCol
 }
 

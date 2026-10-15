@@ -72,7 +72,7 @@ type Terminal struct {
 
 	// Alternate screen buffer (used by curses/fullscreen apps via ?1049h/?47h)
 	altSavedGrid    []widget.TextGridRow // saved main screen rows
-	altSavedRow     int                  // saved cursor row
+	altSavedRow     int                  // saved cursor row, including scrollback
 	altSavedCol     int                  // saved cursor col
 	altBufferActive bool                 // true when alternate buffer is in use
 

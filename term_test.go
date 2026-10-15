@@ -113,6 +113,22 @@ func TestTerminal_Resize_KeepsCursorLine(t *testing.T) {
 	}
 }
 
+func TestTerminal_Resize_AltBuffer(t *testing.T) {
+	for name, rows := range map[string]float32{"taller": 8, "shorter": 3} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10) + "\x1b[?1049h"))
+
+			term.Resize(fyne.NewSize(10*cell.Width, rows*cell.Height))
+			term.handleOutput([]byte("\x1b[?1049lX"))
+			lines := strings.Split(term.Text(), "\n")
+			assert.Equal(t, "L10X", lines[len(lines)-1])
+		})
+	}
+}
+
 func TestTerminal_Resize_NoPanic(t *testing.T) {
 	for name, tt := range map[string]struct {
 		rows          float32
