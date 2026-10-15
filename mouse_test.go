@@ -14,6 +14,22 @@ func TestEncodeMouse(t *testing.T) {
 	assert.Equal(t, "\x1b[M#!!", string(term.encodeMouse(0, 0, fyne.NewPos(4, 4))))
 }
 
+func TestEncodeMouse_ScrollBack(t *testing.T) {
+	term := New()
+	cell := term.guessCellSize()
+	term.Resize(fyne.NewSize(10*cell.Width, 5.5*cell.Height))
+	term.handleOutput([]byte(numberedLines(10)))
+	scroll := term.scrollContainer
+	scroll.Refresh()
+	scroll.ScrollToBottom()
+
+	screenTop := float32(term.rowOffset())*cell.Height - scroll.Offset.Y
+	assert.Equal(t, "\x1b[M !!", string(term.encodeMouse(1, 0, fyne.NewPos(1, screenTop+cell.Height*0.75))))
+
+	scroll.ScrollToTop()
+	assert.Equal(t, "\x1b[M !!", string(term.encodeMouse(1, 0, fyne.NewPos(1, 1))))
+}
+
 func TestEncodeMouse_Mods(t *testing.T) {
 	term := New()
 	assert.Equal(t, "\x1b[M$!!", string(term.encodeMouse(1,
