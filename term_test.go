@@ -28,13 +28,14 @@ func TestTerminal_CreateRenderer_KeepsContent(t *testing.T) {
 	term.handleOutput([]byte("Hello"))
 	assert.Equal(t, "Hello", term.Text())
 
-	grid, cursor := term.content, term.cursor
+	grid, cursor, scroll := term.content, term.cursor, term.scrollContainer
 	// Fyne destroys renderers of widgets that have not been drawn for a while
 	// (e.g. a background tab) and then calls CreateRenderer again.
 	term.CreateRenderer()
 
 	assert.Same(t, grid, term.content)
 	assert.Same(t, cursor, term.cursor)
+	assert.Same(t, scroll, term.scrollContainer)
 	assert.Equal(t, "Hello", term.Text())
 }
 
