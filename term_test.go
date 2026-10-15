@@ -3,6 +3,7 @@ package terminal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -130,6 +131,43 @@ func TestTerminal_Resize_NoPanic(t *testing.T) {
 			assert.NotPanics(t, func() { term.handleOutput([]byte(tt.after)) })
 		})
 	}
+}
+
+func TestTerminal_RunWithConnection_WaitsForRefresh(t *testing.T) {
+	term := New()
+	term.Resize(fyne.NewSize(100, 100))
+
+	app := fyne.CurrentApp()
+	driver := &queueDriver{Driver: app.Driver()}
+	fyne.SetCurrentApp(&queueApp{App: app, driver: driver})
+	defer fyne.SetCurrentApp(app)
+
+	_ = term.RunWithConnection(NopCloser(io.Discard), strings.NewReader("hello"))
+	assert.Empty(t, driver.queue)
+}
+
+// queueDriver queues fyne.Do calls like a busy main loop and runs the queue on fyne.DoAndWait.
+type queueDriver struct {
+	fyne.Driver
+	queue []func()
+}
+
+func (d *queueDriver) DoFromGoroutine(f func(), wait bool) {
+	d.queue = append(d.queue, f)
+	for wait && len(d.queue) > 0 {
+		next := d.queue[0]
+		d.queue = d.queue[1:]
+		next()
+	}
+}
+
+type queueApp struct {
+	fyne.App
+	driver fyne.Driver
+}
+
+func (a *queueApp) Driver() fyne.Driver {
+	return a.driver
 }
 
 func TestTerminal_AddListener(t *testing.T) {

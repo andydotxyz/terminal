@@ -493,7 +493,7 @@ func (t *Terminal) run() {
 		leftOver = t.handleOutput(fullBuf[:num])
 		if len(leftOver) == 0 || time.Since(t.lastRefresh) > maxRefreshInterval {
 			t.lastRefresh = time.Now()
-			fyne.Do(func() {
+			fyne.DoAndWait(func() {
 				if t.scrollContainer != nil {
 					t.scrollContainer.ScrollToBottom()
 				}
