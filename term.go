@@ -623,6 +623,13 @@ func (t *Terminal) rowOffset() int {
 	return off
 }
 
+// fillScreen adds empty rows until the grid is at least as tall as the screen.
+func (t *Terminal) fillScreen() {
+	for len(t.content.Rows) < int(t.config.Rows) {
+		t.content.Rows = append(t.content.Rows, widget.TextGridRow{})
+	}
+}
+
 // trimScrollback removes excess scrollback rows beyond the configured maximum.
 func (t *Terminal) trimScrollback() {
 	excess := len(t.content.Rows) - int(t.config.Rows) - t.scrollbackMax

@@ -216,6 +216,26 @@ func TestAltBuffer_RestoresScreen(t *testing.T) {
 	}
 }
 
+func TestScrollBack_ShortGrid(t *testing.T) {
+	for name, tt := range map[string]struct{ in, out string }{
+		"line feed":           {"Top\x1b[5;1H\n", "\n\n\n\n"},
+		"scroll up":           {"Top\x1b[S", "\n\n\n\n"},
+		"line feed in region": {"\x1b[1;4rTop\r\nBottom\x1b[4;1H\n", "Bottom\n\n\n\n"},
+		"reverse index":       {"Top\x1bM", "\nTop\n\n\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			term.config.Columns = 10
+			term.config.Rows = 5
+			term.scrollBottom = int(term.config.Rows) - 1
+			term.Refresh()
+
+			assert.NotPanics(t, func() { term.handleOutput([]byte(tt.in)) })
+			assert.Equal(t, tt.out, term.Text())
+		})
+	}
+}
+
 func rowText(row widget.TextGridRow) []rune {
 	result := make([]rune, len(row.Cells))
 	for i, c := range row.Cells {

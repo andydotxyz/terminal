@@ -664,6 +664,7 @@ func escapeScrollUp(t *Terminal, msg string) {
 	// Move cursor to the new position
 	t.moveCursor(newCursorRow, t.cursorCol)
 
+	t.fillScreen()
 	off := t.rowOffset()
 	fullScreen := t.scrollTop == 0 && t.scrollBottom >= int(t.config.Rows)-1
 	if fullScreen {
