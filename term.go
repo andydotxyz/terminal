@@ -495,6 +495,9 @@ func (t *Terminal) run() {
 			t.lastRefresh = time.Now()
 			fyne.DoAndWait(func() {
 				if t.scrollContainer != nil {
+					// ScrollToBottom uses the content's current size, so lay it out for the new rows first
+					content := t.scrollContainer.Content
+					content.Resize(content.MinSize().Max(t.scrollContainer.Size()))
 					t.scrollContainer.ScrollToBottom()
 				}
 				t.Refresh()

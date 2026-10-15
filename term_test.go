@@ -133,6 +133,16 @@ func TestTerminal_Resize_NoPanic(t *testing.T) {
 	}
 }
 
+func TestTerminal_RunWithConnection_ScrollsToBottom(t *testing.T) {
+	term := New()
+	cell := term.guessCellSize()
+	term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+
+	_ = term.RunWithConnection(NopCloser(io.Discard), strings.NewReader(numberedLines(10)))
+	scroll := term.scrollContainer
+	assert.Equal(t, scroll.Content.MinSize().Height-scroll.Size().Height, scroll.Offset.Y)
+}
+
 func TestTerminal_RunWithConnection_WaitsForRefresh(t *testing.T) {
 	term := New()
 	term.Resize(fyne.NewSize(100, 100))
