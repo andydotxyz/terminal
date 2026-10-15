@@ -267,7 +267,9 @@ func (t *Terminal) Resize(s fyne.Size) {
 	t.BaseWidget.Resize(s)
 
 	oldRows := int(t.config.Rows)
+	cursorLine := t.rowOffset() + t.cursorRow
 	t.config.Columns, t.config.Rows = cols, rows
+	t.cursorRow = min(max(cursorLine-t.rowOffset(), 0), int(rows)-1)
 	if t.scrollBottom == 0 || t.scrollBottom == oldRows-1 {
 		t.scrollBottom = int(t.config.Rows) - 1
 	}

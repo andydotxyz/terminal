@@ -3,6 +3,7 @@ package terminal
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,22 @@ func TestTerminal_Resize_Narrower(t *testing.T) {
 			continue // written before we got narrower
 		}
 		assert.LessOrEqual(t, len(row.Cells), 5)
+	}
+}
+
+func TestTerminal_Resize_KeepsCursorLine(t *testing.T) {
+	for name, rows := range map[string]float32{"taller": 8, "shorter": 3} {
+		t.Run(name, func(t *testing.T) {
+			term := New()
+			cell := term.guessCellSize()
+			term.Resize(fyne.NewSize(10*cell.Width, 5*cell.Height))
+			term.handleOutput([]byte(numberedLines(10)))
+
+			term.Resize(fyne.NewSize(10*cell.Width, rows*cell.Height))
+			term.handleOutput([]byte("X"))
+			lines := strings.Split(term.Text(), "\n")
+			assert.Equal(t, "L10X", lines[len(lines)-1])
+		})
 	}
 }
 
