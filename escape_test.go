@@ -201,6 +201,21 @@ func TestScrollBack_EditScreen(t *testing.T) {
 	}
 }
 
+func TestAltBuffer_RestoresScreen(t *testing.T) {
+	for name, output := range map[string]string{
+		"scrolled":           numberedLines(10),
+		"scrollback cleared": "\x1b[3J",
+	} {
+		t.Run(name, func(t *testing.T) {
+			term := newScrollbackTerm()
+
+			term.handleOutput([]byte("\x1b[?1049h" + output + "\x1b[?1049lX"))
+			assert.Equal(t, "L6\nL7\nL8\nL9\nL10X", term.Text())
+			assert.Equal(t, 10, len(term.content.Rows))
+		})
+	}
+}
+
 func rowText(row widget.TextGridRow) []rune {
 	result := make([]rune, len(row.Cells))
 	for i, c := range row.Cells {

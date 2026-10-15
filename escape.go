@@ -84,16 +84,7 @@ func (t *Terminal) exitAltBuffer() {
 	}
 	t.altBufferActive = false
 	if t.altSavedGrid != nil {
-		// Restore saved grid content
-		for i, row := range t.altSavedGrid {
-			if i < len(t.content.Rows) {
-				t.content.SetRow(i, row)
-			}
-		}
-		// Clear any extra rows beyond the saved content
-		for i := len(t.altSavedGrid); i < len(t.content.Rows); i++ {
-			t.content.SetRow(i, widget.TextGridRow{})
-		}
+		t.content.Rows = t.altSavedGrid
 		t.altSavedGrid = nil
 	}
 	t.cursorRow = t.altSavedRow
