@@ -230,7 +230,8 @@ func escapeEraseChars(t *Terminal, msg string) {
 		return
 	}
 
-	row := t.content.Row(t.cursorRow)
+	contentRow := t.rowOffset() + t.cursorRow
+	row := t.content.Row(contentRow)
 	cellStyle := &widget.CustomTextGridStyle{FGColor: t.currentFG, BGColor: t.currentBG}
 	// Extend row if cursor is beyond current length
 	for len(row.Cells) < t.cursorCol+count {
@@ -239,7 +240,7 @@ func escapeEraseChars(t *Terminal, msg string) {
 	for i := 0; i < count; i++ {
 		row.Cells[t.cursorCol+i] = widget.TextGridCell{Rune: ' ', Style: cellStyle}
 	}
-	t.content.SetRow(t.cursorRow, row)
+	t.content.SetRow(contentRow, row)
 }
 
 // escapeDeleteLines handles CSI Ps M (DL - Delete Line).
@@ -249,10 +250,11 @@ func escapeDeleteLines(t *Terminal, msg string) {
 	if lines == 0 {
 		lines = 1
 	}
-	for i := t.cursorRow; i <= t.scrollBottom-lines; i++ {
+	off := t.rowOffset()
+	for i := off + t.cursorRow; i <= off+t.scrollBottom-lines; i++ {
 		t.content.SetRow(i, t.content.Row(i+lines))
 	}
-	for i := t.scrollBottom - lines + 1; i <= t.scrollBottom; i++ {
+	for i := off + t.scrollBottom - lines + 1; i <= off+t.scrollBottom; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }
@@ -264,10 +266,11 @@ func escapeScrollDown(t *Terminal, msg string) {
 	if lines == 0 {
 		lines = 1
 	}
-	for i := t.scrollBottom; i >= t.scrollTop+lines; i-- {
+	off := t.rowOffset()
+	for i := off + t.scrollBottom; i >= off+t.scrollTop+lines; i-- {
 		t.content.SetRow(i, t.content.Row(i-lines))
 	}
-	for i := t.scrollTop; i < t.scrollTop+lines && i <= t.scrollBottom; i++ {
+	for i := off + t.scrollTop; i < off+t.scrollTop+lines && i <= off+t.scrollBottom; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }
