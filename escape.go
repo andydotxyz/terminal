@@ -135,7 +135,7 @@ func (t *Terminal) clearScreenToCursor() {
 
 	t.content.SetRow(contentRow, widget.TextGridRow{Cells: cells})
 
-	for i := off; i < contentRow-1; i++ {
+	for i := off; i < contentRow; i++ {
 		t.content.SetRow(i, widget.TextGridRow{})
 	}
 }

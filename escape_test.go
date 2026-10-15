@@ -23,6 +23,14 @@ func TestClearScreen(t *testing.T) {
 	assert.Equal(t, "", term.content.Text())
 }
 
+func TestClearScreenToCursor(t *testing.T) {
+	term := newScrollbackTerm()
+
+	term.handleOutput([]byte("\x1b[4;2H\x1b[1J"))
+	lines := strings.Split(term.Text(), "\n")
+	assert.Equal(t, []string{"", "", ""}, lines[:3])
+}
+
 func TestClearScrollback(t *testing.T) {
 	term := New()
 	term.config.Columns = 80
